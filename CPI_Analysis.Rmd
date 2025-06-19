@@ -1,0 +1,169 @@
+---
+title: ' Inflation Insights: Analyzing India''s Consumer Price Index (2013–2020)'
+author: "Aashita Shukla"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: '2'
+    df_print: paged
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    latex_engine: xelatex
+fontsize: 11pt
+geometry: margin=1in
+mainfont: Arial
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(stringr)
+```
+
+## Introduction
+
+This report presents an analysis of India's Consumer Price Index (CPI) from 2013 to 2020 using publicly available government data. The objective is to evaluate inflation trends across major expenditure categories and understand the volatility of consumer prices using statistical and visualization techniques.
+
+## Project Stack
+
+- Data Wrangling: `readr`, `dplyr`, `tidyr`
+- Date Parsing: `lubridate`
+- Plotting: `ggplot2`
+- Output: PDF report with high-resolution PNG plots
+
+## Data Loading and Cleaning
+
+```{r}
+cpi <- read_csv("../data/All_India_Index_july2019_20Aug2020.csv")
+
+cpi <- cpi %>%
+  mutate(
+    Month = str_to_title(trimws(Month)),
+    Month = case_when(
+      Month %in% c("Janaury", "Janurary") ~ "January",
+      Month %in% c("Febuary", "Febraury") ~ "February",
+      Month %in% c("Mar", "Marhc", "Marcrh") ~ "March",
+      Month %in% c("Apr", "Apirl") ~ "April",
+      Month %in% c("Jun") ~ "June",
+      Month %in% c("Jul") ~ "July",
+      Month %in% c("Sept", "Septmber", "Setpember") ~ "September",
+      Month %in% c("Ocotber") ~ "October",
+      Month %in% c("Noveber") ~ "November",
+      Month %in% c("Deceber") ~ "December",
+      TRUE ~ Month
+    ),
+    date = my(paste(Month, Year))
+  ) %>%
+  filter(!is.na(date))
+```
+
+## Data Transformation
+
+```{r}
+cpi_long <- cpi %>%
+  pivot_longer(cols = `Cereals and products`:`Personal care and effects`,
+               names_to = "category", values_to = "index") %>%
+  filter(!is.na(index), !is.na(date)) %>%
+  group_by(date, category) %>%
+  summarise(index = mean(index), .groups = "drop")
+```
+
+## CPI Trends Over Time
+
+```{r}
+key_categories <- c("Food and beverages", "Fuel and light", "Housing")
+
+category_colors <- c(
+  "Food and beverages" = "blue",
+  "Fuel and light" = "red",
+  "Housing" = "darkgreen"
+)
+
+ggplot(filter(cpi_long, category %in% key_categories),
+       aes(x = date, y = index, color = category)) +
+  geom_line(size = 0.8) +
+  scale_color_manual(values = category_colors) +
+  labs(title = "CPI Trends: Food, Fuel, Housing (2013-2020)",
+       subtitle = "Based on all-India Rural+Urban Index",
+       x = "Date", y = "Index (Base = 2012)", color = "Category") +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid.minor = element_blank()
+  )
+
+ggsave("outputs/cpi_trend_plot.png", plot = last_plot(), width = 8, height = 4, dpi = 300)
+```
+
+## Monthly % Change in Fuel Prices
+
+```{r}
+cpi_growth <- cpi_long %>%
+  group_by(category) %>%
+  arrange(date) %>%
+  mutate(pct_change = (index - lag(index)) / lag(index) * 100) %>%
+  ungroup()
+
+fuel_growth <- filter(cpi_growth, category == "Fuel and light") %>%
+  group_by(date) %>%
+  summarise(pct_change = mean(pct_change, na.rm = TRUE), .groups = "drop")
+
+ggplot(fuel_growth, aes(x = date, y = pct_change)) +
+  geom_line(color = "darkred", size = 0.8) +
+  labs(title = "Monthly % Change in Fuel Prices",
+       x = "Date", y = "% Change") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("outputs/fuel_pct_change_plot.png", plot = last_plot(), width = 8, height = 4, dpi = 300)
+```
+
+## Most Volatile CPI Categories
+
+```{r}
+volatility <- cpi_long %>%
+  group_by(category) %>%
+  summarise(volatility = sd(index, na.rm = TRUE)) %>%
+  arrange(desc(volatility)) %>%
+  slice_head(n = 5)
+
+ggplot(volatility, aes(x = reorder(category, volatility), y = volatility)) +
+  geom_col(fill = "darkblue") +
+  coord_flip() +
+  labs(title = "Top 5 Most Volatile CPI Categories (2013–2020)",
+       x = "Category", y = "Standard Deviation of Index") +
+  theme_light(base_size = 12)
+
+ggsave("outputs/volatility_plot.png", plot = last_plot(), width = 8, height = 4, dpi = 300)
+```
+
+## Key Insights
+
+- **Fuel and Light** showed the highest volatility, particularly in 2020 during the COVID period.
+- **Food and Beverages** rose steadily with seasonal patterns, influenced by agricultural cycles.
+- **Housing** remained relatively stable with minimal short-term variation.
+
+## Conclusion
+
+This report provides a comprehensive analysis of Consumer Price Index trends in India from 2013 to 2020. Through careful data cleaning and visualization, it examines how inflation varied across different sectors and highlights the economic dynamics affecting each category.
+
+Fuel and Light showed the most volatility, driven by external factors such as energy prices and the COVID-19 pandemic. Food and Beverages exhibited a clear seasonal trend, underscoring the importance of agricultural cycles in shaping price levels. In contrast, Housing remained steady, pointing to relatively inflexible costs in this sector.
+
+These insights can help economists, analysts, and policymakers better understand sectoral inflation patterns, and offer a foundation for further research or policy design that considers the stability and variability of different consumer spending areas. into how price trends evolved across essential categories in India. While Fuel and Light exhibited significant volatility—especially during external shocks like COVID-19—Food and Beverages followed a steady seasonal pattern, and Housing remained largely stable. These insights can inform future policy decisions, business strategies, and further academic analysis.
+
+## Appendix: CPI Category Descriptions
+
+- **Food and Beverages** – Cereals, vegetables, milk, beverages, etc.
+- **Fuel and Light** – Electricity, LPG, kerosene, petrol
+- **Housing** – Rent-related urban expenditure
+- **Miscellaneous** – Education, transport, personal care, etc.
