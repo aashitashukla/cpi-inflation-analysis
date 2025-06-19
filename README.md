@@ -23,7 +23,7 @@ Using publicly available government CPI data, the project performs:
 ```
 📦 cpi-inflation-analysis
 ├── CPI_Analysis.Rmd                # Main RMarkdown report
-├── CPI_India_Analysis_AashitaShukla.pdf   # Final rendered PDF report
+├── CPI_Analysis.pdf   # Final rendered PDF report
 ├── outputs/
 │   ├── cpi_trend_plot.png
 │   ├── fuel_pct_change_plot.png
